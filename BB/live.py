@@ -14,6 +14,35 @@ from BB.permissions import *
 
 
 class LiveCheck(commands.Cog):
+    '''
+    Where the bulk of the action happens in terms of checking Twitch for live streams.
+    Tries its best to be efficient about sending requests to the Twitch API.
+    Major bottleneck is that for every live stream, a follower count request is made.
+        This issue snowballs quickly.
+    Other requests are done in bulk, by chunks of 100 globally.
+    The process (loop):
+        Get the full list of servers (build a big list of games and names to query)
+        Get the list of streamers using these requests:
+            gather_byUser - chunks of 100,              1-n requests
+        Make a map of games and game ids using these requests:
+            get_game_id_by_names - chunks of 100,       1-n requests
+            get_game_name_by_ids - chunks of 100,       1-n requests
+        Get the list of streams by category
+            gather_byGame - run get_game_id_by_names,   2-n requests
+        Get the misc info about streamers/blacklisted streamers
+            gather_userinfo_by_id - chunks of 100,      1-n requests
+            gather_userinfo_by_name - chunks of 100,    1-n requests
+        Figure out the streams that went offline and went online
+        Delete offline streams
+        Push new streams (per stream per server)
+            If no game map is set, request the game     1 request for each instance
+            Get the follow count of the stream          1 request per stream
+        Edit streams that didn't go offline
+            If no game map is set, request the game     1 request for each instance
+            Get the follow count of the stream          1 request per stream
+    This means per loop, there are at least 9 requests.
+    For each live streamer, there is 1 more request per server they are visible in.
+    '''
     def __init__(self, bot, config):
         self.BarryBot = bot
         self.bot = bot.bot
