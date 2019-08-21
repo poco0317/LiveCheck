@@ -733,9 +733,10 @@ class ServerSettings:
         self.config = configparser.ConfigParser(interpolation=None)
         if not self.config.read(self.config_filepath, encoding='utf-8'):
             try:
+                os.makedirs(os.path.dirname(self.config_filepath), exist_ok=True)
                 shutil.copy(os.path.dirname(config.options)+"/example_server.ini", self.config_filepath)
             except:
-                self.fallback_vars()
+                traceback.print_exc()
                 print("failure")
     
         self.config.read(self.config_filepath, encoding='utf-8')
