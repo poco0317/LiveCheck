@@ -288,8 +288,9 @@ class LiveCheck(commands.Cog):
     async def wait_for_request_window(self, url):
         '''sometimes we get rate limited. wait for the rate limit window by doing this.'''
         attempt = True
+        quit_threshold = 0
         output = {}
-        while attempt:
+        while attempt and quit_threshold < 60:
             async with self.aio_session.get(url) as response:
                 output = await response.json()
                 if "status" in output:
@@ -303,6 +304,7 @@ class LiveCheck(commands.Cog):
                         await asyncio.sleep(15)
                     else:
                         print(f"\t{output}")
+                        quit_threshold += 1
                         await asyncio.sleep(1)
                 else:
                     attempt = False
