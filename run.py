@@ -62,6 +62,8 @@ async def on_message(message):
 @bot.event
 async def on_command_error(ctx, error):
     ''' really sad error catch thing '''
+    if isinstance(error, discord.ext.commands.errors.CommandNotFound):
+        return
     if isinstance(error, PermissionException):
         return await ctx.send(f"```Error\n{error.message}```")
     if isinstance(error, commands.MissingRequiredArgument):
