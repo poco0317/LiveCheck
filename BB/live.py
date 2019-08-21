@@ -168,7 +168,7 @@ class LiveCheck(commands.Cog):
             game_name = game_map[stream["game_id"]]
         stream_id = stream["user_id"]
         followers = await self.get_followcount_by_id(stream_id)
-        e = __produce_stream_embed(stream, userinfo, game_name, followers)
+        e = self.produce_stream_embed(stream, userinfo, game_name, followers)
         msg = await channel.send(embed=e)
         return (str(msg.id), userinfo["login"], stream_id)
 
@@ -200,10 +200,10 @@ class LiveCheck(commands.Cog):
                 game_name = game_map[stream["game_id"]]
             stream_id = stream["user_id"]
             followers = await self.get_followcount_by_id(stream_id)
-            e = __produce_stream_embed(stream, userinfo, game_name, followers)
+            e = self.produce_stream_embed(stream, userinfo, game_name, followers)
             await msg.edit(embed=e)
 
-    def __produce_stream_embed(self, stream, userinfo, game, follows):
+    def produce_stream_embed(self, stream, userinfo, game, follows):
         '''return a discord embed based on the info given'''
         title = stream["title"].strip() if "title" in stream else "(blank title)"
         thumb = stream["thumbnail_url"].replace("{width}", "256").replace("{height}", "144")
