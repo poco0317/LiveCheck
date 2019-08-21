@@ -84,12 +84,9 @@ class Main(commands.Cog):
         ''' Makes a new channel using the name of the 2 people mentioned.
         Doesn't require mentioning as long as the users exist in the server.
         This is a hidden command for personal use. '''
-        try:
-            overwrites = {
-                ctx.guild.default_role : discord.PermissionOverwrite(read_messages=False),
-                first : discord.PermissionOverwrite(read_messages=True, send_messages=True, embed_links=True, attach_files=True, read_message_history=True),
-                second : discord.PermissionOverwrite(read_messages=True, send_messages=True, embed_links=True, attach_files=True, read_message_history=True)
-            }
-            await ctx.guild.create_text_channel(f"{first.name}-{second.name}", overwrites=overwrites)
-        except:
-            traceback.print_exc()
+        overwrites = {
+            ctx.guild.default_role : discord.PermissionOverwrite(read_messages=False),
+            first : discord.PermissionOverwrite(read_messages=True, send_messages=True, embed_links=True, attach_files=True, read_message_history=True),
+            second : discord.PermissionOverwrite(read_messages=True, send_messages=True, embed_links=True, attach_files=True, read_message_history=True)
+        }
+        await ctx.guild.create_text_channel(f"{first.name}-{second.name}", overwrites=overwrites)

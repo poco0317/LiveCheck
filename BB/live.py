@@ -33,7 +33,6 @@ class LiveCheck(commands.Cog):
     async def livecheck_loop(self):
         while True:
             await asyncio.sleep(300)
-            # await self.refreshAllStreams()
             try:
                 await self.aggregate_and_refresh_all()
             except:
@@ -59,18 +58,6 @@ class LiveCheck(commands.Cog):
                 await msg.delete()
         await mm.edit(content="Done.", delete_after=5)
         sess.updating = False
-
-    async def refreshAllStreams(self):
-        '''refresh every stream.'''
-        for guild_id in self.sessions:
-            try:
-                print(f"Trying to update guild {guild_id}")
-                if not self.sessions[guild_id].updating:
-                    await self.refreshStreams_by_guild(guild_id)
-            except:
-                print(f"Failed to update for {guild_id}")
-                self.sessions[guild_id].updating = False
-                traceback.print_exc()
 
     async def aggregate_and_refresh_all(self, specific_guild=None):
         '''get all streams for all servers'''
@@ -116,38 +103,6 @@ class LiveCheck(commands.Cog):
                 traceback.print_exc()
                 continue
 
-    async def refreshStreams_by_guild(self, guild_id):
-        '''refresh streams for a specific guild id'''
-        sess = self.sessions[guild_id]
-        if sess.updating: return False
-        try:
-            channel = discord.utils.get(self.bot.get_all_channels(), id=int(sess.settings.configuration["channel_id"]))
-        except:
-            return False
-        sess.updating = True
-        old_streams = list(sess.created_messages)
-        old_stream_ids = {x[2] for x in sess.created_messages}
-        dead_streams = set()
-        edit_streams = []
-        new_streams = []
-        new_stream_dict = await self.get_streams_for_guild(guild_id, channel)
-        for stream in old_streams.copy(): # remove old ones
-            if stream[2] not in new_stream_dict:
-                old_streams.remove(stream)
-                old_stream_ids.remove(stream[2])
-                dead_streams.add(stream)
-            else:
-                edit_streams.append((stream[0], new_stream_dict[stream[2]]))
-        await self.kill_old_stream(guild_id, dead_streams, channel)
-        new_streams.extend(old_streams)
-        for stream_id, stream in new_stream_dict.items(): # add new ones
-            if stream_id not in old_stream_ids:
-                new_streams.append(await self.push_new_stream(guild_id, stream, channel))
-        await self.update_old_streams(guild_id, edit_streams, channel)
-        sess.created_messages = set(new_streams)
-        sess.update()
-        sess.updating = False
-
     async def kill_old_stream(self, guild_id, streams, channel=None):
         '''delete the message for old streams'''
         sess = self.sessions[guild_id]
@@ -183,7 +138,6 @@ class LiveCheck(commands.Cog):
             game_name = game_map[stream["game_id"]]
         stream_id = stream["user_id"]
         title = stream["title"].strip() if "title" in stream else "(blank title)"
-        #userinfo = (await self.get_userinfo_by_id(stream_id))[0]
         followers = await self.get_followcount_by_id(stream_id)
         e = discord.Embed(title=f"{stream['user_name']} playing {game_name}", description = f'"{title}"', color=discord.Color.dark_purple(), timestamp=dt.datetime.utcnow(), url=f"https://twitch.tv/{userinfo['login']}")
         e.set_author(name="Live on Twitch:")
@@ -236,7 +190,6 @@ class LiveCheck(commands.Cog):
                 game_name = game_map[stream["game_id"]]
             stream_id = stream["user_id"]
             title = stream["title"].strip() if "title" in stream else "(blank title)"
-            #userinfo = (await self.get_userinfo_by_id(stream_id))[0]
             followers = await self.get_followcount_by_id(stream_id)
             e = discord.Embed(title=f"{stream['user_name']} playing {game_name}", description = f'"{title}"', color=discord.Color.dark_purple(), timestamp=dt.datetime.utcnow(), url=f"https://twitch.tv/{userinfo['login']}")
             e.set_author(name="Live on Twitch:")
@@ -259,52 +212,6 @@ class LiveCheck(commands.Cog):
                 desc = "No description"
             e.add_field(name="Description", value=desc)
             await msg.edit(embed=e)
-
-
-    async def get_streams_for_guild(self, guild_id, channel=None):
-        '''return a dict of streams for the given guild
-        mapping user ids to stream dicts'''
-        sess = self.sessions[guild_id]
-        if channel is None:
-            try:
-                channel = discord.utils.get(self.bot.get_all_channels(), id=int(sess.settings.configuration["channel_id"]))
-            except:
-                return False
-        games = sess.settings.get("Config", "defined_games")
-        game_streams = await self.gather_byGame(games)
-        users = sess.settings.get("Config", "defined_streams")
-        user_streams = await self.gather_byUser(users)
-        blacklisted_ids = set()
-        blacklisted_streams = await self.gather_byUser(sess.settings.get("Config", "blacklisted_streams"))
-        for stream in blacklisted_streams:
-            blacklisted_ids.add(stream["user_id"])
-        final_streams = {}
-        for stream in game_streams:
-            if stream["user_id"] in blacklisted_ids:
-                continue
-            final_streams[stream["user_id"]] = stream
-        for stream in user_streams:
-            if stream["user_id"] in blacklisted_ids:
-                continue
-            final_streams[stream["user_id"]] = stream
-        return final_streams
-
-    @commands.command()
-    @commands.check(Perms.is_owner)
-    async def globalupdate(self, ctx):
-        '''- Force update every server for the bot'''
-        await self.aggregate_and_refresh_all()
-        print("Finished update of all guilds.")
-        await ctx.send("Finished update of all guilds.")
-
-    @commands.command()
-    @commands.check(Perms.is_owner)
-    async def globalerase(self, ctx):
-        '''- Force erase stream messages in every server for the bot'''
-        for guild in self.sessions:
-            await self.cleanupStreams(guild)
-            print(f"Finished deletion of guild {guild}")
-        await ctx.send("Finished deleting all messages.")
 
     async def get_streams_for_all_guilds(self, specific_guild=None):
         '''return a dict of all streams for all guilds
@@ -377,19 +284,6 @@ class LiveCheck(commands.Cog):
         # output is:
         # a dict mapping guild ids to dicts, mapping streamer names to tuples of (userinfo, streaminfo)
         return output, game_id_mappings2
-
-
-    @commands.Cog.listener()
-    async def on_ready(self):
-        for guild in self.bot.guilds:
-            self.sessions[guild.id] = LiveBrain(guild.id, self.config)
-            self.sessions[guild.id].settings.verify()
-
-    @commands.Cog.listener()
-    async def on_guild_join(self, guild):
-        if guild.id not in self.sessions:
-            self.sessions[guild.id] = LiveBrain(guild.id, self.config)
-            self.sessions[guild.id].settings.verify()
 
     async def wait_for_request_window(self, url):
         '''sometimes we get rate limited. wait for the rate limit window by doing this.'''
@@ -495,7 +389,9 @@ class LiveCheck(commands.Cog):
 
     async def get_game_name_by_ids(self, game_ids):
         '''
-        Opposite of the above method.
+        Use new twitch api to get a game name by game id
+        game_ids needs to be a list of strings
+        returns a dict mapping those ids to names
         '''
         game_names = {}
         for i in range(0, len(game_ids), 100):
@@ -527,6 +423,35 @@ class LiveCheck(commands.Cog):
         '''
         json_response = await self.wait_for_request_window("https://api.twitch.tv/helix/streams?user_id=" + channel_id)
         return len(json_response["data"]) != 0
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        for guild in self.bot.guilds:
+            self.sessions[guild.id] = LiveBrain(guild.id, self.config)
+            self.sessions[guild.id].settings.verify()
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild):
+        if guild.id not in self.sessions:
+            self.sessions[guild.id] = LiveBrain(guild.id, self.config)
+            self.sessions[guild.id].settings.verify()
+
+    @commands.command()
+    @commands.check(Perms.is_owner)
+    async def globalupdate(self, ctx):
+        '''- Force update every server for the bot'''
+        await self.aggregate_and_refresh_all()
+        print("Finished update of all guilds.")
+        await ctx.send("Finished update of all guilds.")
+
+    @commands.command()
+    @commands.check(Perms.is_owner)
+    async def globalerase(self, ctx):
+        '''- Force erase stream messages in every server for the bot'''
+        for guild in self.sessions:
+            await self.cleanupStreams(guild)
+            print(f"Finished deletion of guild {guild}")
+        await ctx.send("Finished deleting all messages.")
 
     @commands.command(aliases=["blacklist"])
     @commands.check(Perms.is_guild_mod)
@@ -847,20 +772,6 @@ class ServerSettings:
         example_config_path = os.path.dirname(os.path.dirname(self.config_filepath))+"/example_server.ini"
         configurerer.read(example_config_path, encoding="utf-8")
         return configurerer[section][name]
-
-    def get_command_from_alias(self, name, format=True):
-        '''Find the real command name for an alias in the bot.
-        This must be a last resort after having used .get_command(name)'''
-        checkName = None
-        for c,a in self.aliases.items():
-            if name in a.split():
-                checkName = c
-                break
-        if checkName is None:
-            return None
-        if format:
-            return re.sub("_", " ", checkName)
-        return checkName
 
     def num_to_bool(self, section, name, truefalse="on off"):
         '''Return a conversion of 1 or 0 to True or False, basically.
