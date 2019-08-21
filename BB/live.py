@@ -166,28 +166,8 @@ class LiveCheck(commands.Cog):
         elif stream["game_id"] != "0":
             game_name = game_map[stream["game_id"]]
         stream_id = stream["user_id"]
-        title = stream["title"].strip() if "title" in stream else "(blank title)"
         followers = await self.get_followcount_by_id(stream_id)
-        e = discord.Embed(title=f"{stream['user_name']} playing {game_name}", description = f'"{title}"', color=discord.Color.dark_purple(), timestamp=dt.datetime.utcnow(), url=f"https://twitch.tv/{userinfo['login']}")
-        e.set_author(name="Live on Twitch:")
-        e.set_footer(text="Twitch", icon_url=self.bot.user.avatar_url)
-        thumb = stream["thumbnail_url"].replace("{width}", "256")
-        thumb = thumb.replace("{height}", "144")
-        e.set_image(url=thumb)
-        e.set_thumbnail(url=userinfo["profile_image_url"])
-        e.add_field(name="Followers", value=followers)
-        e.add_field(name="Total Views", value=userinfo["view_count"])
-        e.add_field(name="Current Views", value=stream["viewer_count"])
-        btype = userinfo["broadcaster_type"]
-        if btype == "":
-            btype = "Non-Affiliate"
-        else:
-            btype = btype.capitalize()
-        e.add_field(name="Status", value=btype)
-        desc = userinfo["description"]
-        if desc == "":
-            desc = "No description"
-        e.add_field(name="Description", value=desc)
+        e = __produce_stream_embed(stream, userinfo, game_name, followers)
         msg = await channel.send(embed=e)
         return (str(msg.id), userinfo["login"], stream_id)
 
@@ -218,29 +198,33 @@ class LiveCheck(commands.Cog):
             elif stream["game_id"] != "0":
                 game_name = game_map[stream["game_id"]]
             stream_id = stream["user_id"]
-            title = stream["title"].strip() if "title" in stream else "(blank title)"
             followers = await self.get_followcount_by_id(stream_id)
-            e = discord.Embed(title=f"{stream['user_name']} playing {game_name}", description = f'"{title}"', color=discord.Color.dark_purple(), timestamp=dt.datetime.utcnow(), url=f"https://twitch.tv/{userinfo['login']}")
-            e.set_author(name="Live on Twitch:")
-            e.set_footer(text="Twitch", icon_url=self.bot.user.avatar_url)
-            thumb = stream["thumbnail_url"].replace("{width}", "256")
-            thumb = thumb.replace("{height}", "144")
-            e.set_image(url=thumb)
-            e.set_thumbnail(url=userinfo["profile_image_url"])
-            e.add_field(name="Followers", value=followers)
-            e.add_field(name="Total Views", value=userinfo["view_count"])
-            e.add_field(name="Current Views", value=stream["viewer_count"])
-            btype = userinfo["broadcaster_type"]
-            if btype == "":
-                btype = "Non-Affiliate"
-            else:
-                btype = btype.capitalize()
-            e.add_field(name="Status", value=btype)
-            desc = userinfo["description"]
-            if desc == "":
-                desc = "No description"
-            e.add_field(name="Description", value=desc)
+            e = __produce_stream_embed(stream, userinfo, game_name, followers)
             await msg.edit(embed=e)
+
+    def __produce_stream_embed(self, stream, userinfo, game, follows):
+        '''return a discord embed based on the info given'''
+        title = stream["title"].strip() if "title" in stream else "(blank title)"
+        thumb = stream["thumbnail_url"].replace("{width}", "256").replace("{height}", "144")
+        e = discord.Embed(title=f"{stream['user_name']} playing {game}", description = f'"{title}"', color=discord.Color.dark_purple(), timestamp=dt.datetime.utcnow(), url=f"https://twitch.tv/{userinfo['login']}")
+        e.set_author(name="Live on Twitch:")
+        e.set_footer(text="Twitch", icon_url=self.bot.user.avatar_url)
+        e.set_image(url=thumb)
+        e.set_thumbnail(url=userinfo["profile_image_url"])
+        e.add_field(name="Followers", value=follows)
+        e.add_field(name="Total Views", value=userinfo["view_count"])
+        e.add_field(name="Current Views", value=stream["viewer_count"])
+        btype = userinfo["broadcaster_type"]
+        if btype == "":
+            btype = "Non-Affiliate"
+        else:
+            btype = btype.capitalize()
+        e.add_field(name="Status", value=btype)
+        desc = userinfo["description"]
+        if desc == "":
+            desc = "No description"
+        e.add_field(name="Description", value=desc)
+        return e
 
     async def get_streams_for_all_guilds(self, specific_guild=None):
         '''return a dict of all streams for all guilds
