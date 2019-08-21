@@ -127,8 +127,9 @@ class LiveCheck(commands.Cog):
                 sess.created_messages = set(new_streams)
                 sess.update()
                 sess.updating = False
-            except:
+            except Exception as e:
                 sess.updating = False
+                await self.BarryBot.logchan.send(f"Error in updating for guild {guild_id} ```{''.join(traceback.format_tb(e.__traceback__))}```")
                 traceback.print_exc()
                 continue
 
