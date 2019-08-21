@@ -609,7 +609,7 @@ class LiveCheck(commands.Cog):
             return await ctx.send(f"Livestreams have been updated in {channel.mention}")
 
 class LiveBrain:
-    ''' like a brain for each server, a db instance, whatever you want (also holds a configparser instance)'''
+    ''' like a brain for each server, a db instance, whatever you want (also holds a ServerSettings instance)'''
     def __init__(self, serverID, config):
         self.serverID = str(serverID)
         self.brainDB = GeneralDB("live_"+self.serverID)
