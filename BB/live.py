@@ -60,13 +60,22 @@ class LiveCheck(commands.Cog):
         self.aio_session = aiohttp.ClientSession(headers={"Client-ID": self.config.auth_id})
 
     async def livecheck_loop(self):
+        failures = []
         while True:
             await asyncio.sleep(300)
             try:
                 await self.aggregate_and_refresh_all()
-            except:
-                traceback.print_exc()
-                await self.BarryBot.logchan.send("There was an exception in the stream update loop.")
+                if len(failures) > 0:
+                    for failure in failures:
+                        await self.BarryBot.logchan.send(failure)
+                    failures = []
+            except Exception as e:
+                failures.append(f"{dt.datetime.utcnow()} Failed due to {e}")
+                try:
+                    traceback.print_exc()
+                    await self.BarryBot.logchan.send("There was an exception in the stream update loop.")
+                except:
+                    failures.append(f"{dt.datetime.utcnow()} Failed to send error report to log channel.")
 
     async def cleanupStreams(self, guild_id):
         '''delete old messages'''
