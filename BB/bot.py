@@ -79,6 +79,18 @@ class Main(commands.Cog):
                 print(f"\tCategory: {chan} ID: {chan.id}")
 
     @commands.command(hidden=True)
+    @commands.check(Perms.is_owner)
+    async def get_allmembers(self, ctx):
+        ''' Output a list of all members with IDs to a txt file locally '''
+        f = open("members.txt", "w")
+        out = ""
+        for m in ctx.guild.members:
+            out += f"{m}\n"
+        f.write(out)
+        f.close()
+        await ctx.send("Done.")
+
+    @commands.command(hidden=True)
     @commands.check(Perms.is_guild_superadmin)
     async def judgey(self, ctx, first : discord.Member, second : discord.Member):
         ''' Makes a new channel using the name of the 2 people mentioned.
