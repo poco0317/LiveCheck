@@ -546,6 +546,23 @@ class LiveCheck(commands.Cog):
         else:
             return await ctx.send(f"{streamer}'s streams will be watched.")
 
+    @commands.command(name="resetstreams", aliases=["resetusers"])
+    @commands.check(Perms.is_guild_mod)
+    async def reset_streams(self, ctx):
+        '''- Reset the list of streamers watched to empty it.'''
+        sess = self.sessions[ctx.guild.id]
+        sess.settings.modify("Config", "defined_streams", "")
+        return await ctx.send("I have reset the list of streamers watched.")
+
+    @commands.command(name="streamsfromlist", aliases=["bulkusers", "bulkstreams"])
+    @commands.check(Perms.is_guild_mod)
+    async def bulk_add_streams(self, ctx, *streamers):
+        '''- Replace the current list of streamers by another list of streamers.'''
+        sess = self.sessions[ctx.guild.id]
+        the_streamers = "^^".join(streamers).lower()
+        sess.settings.modify("Config", "defined_streams", the_streamers)
+        return await ctx.send(f"I have reset the watched stream list to {len(streamers)} streamers.")
+
     @commands.command(name="channel", aliases=["chan", "setchan"])
     @commands.check(Perms.is_guild_mod)
     async def _channel(self, ctx, chan : discord.TextChannel = None):
