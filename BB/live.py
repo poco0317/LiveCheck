@@ -531,6 +531,7 @@ class LiveCheck(commands.Cog):
     async def stream(self, ctx, streamer : str = "give me the list"):
         '''- Add a specified streamer to the list or remove them.'''
         sess = self.sessions[ctx.guild.id]
+        streamer = streamer.lower()
         if streamer == "give me the list":
             streams = sess.settings.get("Config", "defined_streams")
             if len(streams) == 0:
