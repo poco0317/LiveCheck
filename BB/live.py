@@ -309,7 +309,10 @@ class LiveCheck(commands.Cog):
                 if streamer in blacks: continue
                 if streamer in dict_o_streams:
                     if streamer in guild_streams: continue
-                    if len(whites) > 0 and game_id_mappings2[dict_o_streams[streamer]["game_id"]] not in whites: continue # skip non whitelisted categories if applicable
+                    if len(whites) > 0:
+                        # skip non whitelisted categories if applicable
+                        game_name = game_id_mappings2.get(dict_o_streams[streamer][1]["game_id"], None)
+                        if game_name is not None and game_name.lower() not in whites: continue
                     guild_streams[streamer] = dict_o_streams[streamer]
             output[guild_id] = guild_streams
         # output is:
