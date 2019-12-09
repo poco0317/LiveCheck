@@ -243,8 +243,10 @@ class LiveCheck(commands.Cog):
         games = set()
         users = set()
         blacks = set()
+        whites = set()
         output = {}
         blacklisted_streams = {} # mapping server ids to lists of streams
+        whitelisted_games = {} # mapping server ids to lists of categories
         todo = self.sessions.keys()
         if specific_guild is not None:
             todo = [specific_guild]
@@ -256,6 +258,7 @@ class LiveCheck(commands.Cog):
                 skipped_guilds.add(guild_id)
                 continue
             games |= set(sess.settings.get("Config", "defined_games"))
+            whites |= set(sess.settings.get("Config", "whitelisted_games"))
             users |= set(sess.settings.get("Config", "defined_streams"))
             blacks |= set(sess.settings.get("Config", "blacklisted_streams"))
         user_streams = await self.gather_byUser(list(users))
@@ -265,6 +268,8 @@ class LiveCheck(commands.Cog):
             game_ids.add(stream["game_id"])
         game_id_mappings = await self.get_game_id_by_names(list(games)) # a map of names to ids
         game_id_mappings2 = dict((v,k) for k,v in game_id_mappings.items()) # swapped version of that list
+        whitelisted_game_mapping_ids = await self.get_game_id_by_names(list(whites)) # a map of names to ids
+        whitelisted_game_mapping_names = dict((v,k) for k,v in whitelisted_game_mapping_ids.items()) # a swapped version of that list
         for gameid in game_ids:
             if gameid not in game_id_mappings2:
                 games_to_resolve.add(gameid)
@@ -287,9 +292,11 @@ class LiveCheck(commands.Cog):
             if guild_id in skipped_guilds: continue
             sess = self.sessions[guild_id]
             blacks = set(sess.settings.get('Config', "blacklisted_streams"))
+            whites = set(sess.settings.get('Config', "whitelisted_games"))
             guild_streams = {}
             # by game
             for category in sess.settings.get("Config", "defined_games"):
+                if len(whites) > 0 and category not in whites: continue # skip non whitelisted categories if applicable
                 for name, stream_tuple in dict_o_streams.items():
                     if stream_tuple[0]["login"] in blacks: continue
                     if name in guild_streams: continue
@@ -302,6 +309,7 @@ class LiveCheck(commands.Cog):
                 if streamer in blacks: continue
                 if streamer in dict_o_streams:
                     if streamer in guild_streams: continue
+                    if len(whites) > 0 and game_id_mappings2[dict_o_streams[streamer]["game_id"]] not in whites: continue # skip non whitelisted categories if applicable
                     guild_streams[streamer] = dict_o_streams[streamer]
             output[guild_id] = guild_streams
         # output is:
@@ -507,6 +515,36 @@ class LiveCheck(commands.Cog):
             finalout += f"\nIgnored {len(added)} streamers:\n```" + ", ".join(sorted(added)) + "```"
         return await ctx.send(finalout)
 
+    @commands.command(aliases=["gamelist"])
+    @commands.check(Perms.is_guild_mod)
+    async def whitelist(self, ctx, *games):
+        '''- Set a whitelist of games if watching several streamers.'''
+        sess = self.sessions[ctx.guild.id]
+        if len(games) == 0:
+            whitelisted_games = sess.settings.get("Config", "whitelisted_games")
+            if len(whitelisted_games) == 0:
+                return await ctx.send("There are no whitelisted games. Any game may show up if a streamer is watched.")
+            else:
+                try:
+                    return await ctx.send(f"These are the whitelisted categories ({len(whitelisted_games)} of them):\n```"+", ".join(whitelisted_games)+"```")
+                except:
+                    return await ctx.send(f"It seems you whitelisted so many games, the message was too big. There are {len(whitelisted_games)} categories in the list. (contact bot dev for help)")
+        removed = set()
+        added = set()
+        games = set([x.lower() for x in games])
+        for game in sorted(games):
+            if not sess.toggleWhitelist(game):
+                removed.add(game)
+            else:
+                added.add(game)
+        finalout = ""
+        if len(removed) > 0:
+            finalout += f"Un-whitelisted {len(removed)} games:\n```" + ", ".join(sorted(removed)) + "```"
+        if len(added) > 0:
+            finalout += f"\nWhitelisted {len(added)} games:\n```" + ", ".join(sorted(added)) + "```"
+        return await ctx.send(finalout)
+
+
     @commands.command(aliases=["cat", "category", "watch"])
     @commands.check(Perms.is_guild_mod)
     async def game(self, ctx, *, game_name : str = "give me the list"):
@@ -627,9 +665,9 @@ class LiveBrain:
         self.brainDB = GeneralDB("live_"+self.serverID)
         self.verifyTables()
         
-        # this holds a dict called configuration which holds 4 keys
-        # "defined_streams", "defined_games", "blacklisted_streams", "channel_id"
-        # the first 3 are strings in the form of a list while the last is a single id
+        # this holds a dict called configuration which holds 5 keys
+        # "defined_streams", "defined_games", "blacklisted_streams", "whitelisted_games", channel_id"
+        # the first 4 are strings in the form of a list while the last is a single id
         self.settings = ServerSettings(serverID, config)
 
         self.created_messages = set()
@@ -664,6 +702,10 @@ class LiveBrain:
     def toggleBlacklist(self, streamer):
         '''add or remove a user from the blacklist'''
         return self.__toggleConfigThing("blacklisted_streams", streamer)
+
+    def toggleWhitelist(self, game):
+        '''add or remove a game from the whitelist'''
+        return self.__toggleConfigThing("whitelisted_games", game)
 
     def toggleGame(self, game_name):
         '''add or remove a game from the list'''
@@ -768,6 +810,7 @@ class ServerSettings:
         self.sanity_check_individual("Config", "defined_streams", guild)
         self.sanity_check_individual("Config", "defined_games", guild)
         self.sanity_check_individual("Config", "blacklisted_streams", guild)
+        self.sanity_check_individual("Config", "whitelisted_games", guild)
         self.sanity_check_individual("Config", "channel_id", guild)
 
     def sanity_check_individual(self, section, name, guild):
