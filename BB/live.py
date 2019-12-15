@@ -174,7 +174,10 @@ class LiveCheck(commands.Cog):
             except:
                 pass
         elif stream["game_id"] != "0":
-            game_name = game_map[stream["game_id"]]
+            try:
+                game_name = game_map[stream["game_id"]]
+            except:
+                game_name = "(Unknown Category)"
         stream_id = stream["user_id"]
         followers = await self.get_followcount_by_id(stream_id)
         e = self.produce_stream_embed(stream, userinfo, game_name, followers)
@@ -206,7 +209,10 @@ class LiveCheck(commands.Cog):
                 except:
                     pass
             elif stream["game_id"] != "0":
-                game_name = game_map[stream["game_id"]]
+                try:
+                    game_name = game_map[stream["game_id"]]
+                except:
+                    game_name = "(Unknown Category)"
             stream_id = stream["user_id"]
             followers = await self.get_followcount_by_id(stream_id)
             e = self.produce_stream_embed(stream, userinfo, game_name, followers)
