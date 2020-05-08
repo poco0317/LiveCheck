@@ -518,9 +518,9 @@ class LiveCheck(commands.Cog):
                 added.add(streamer)
         finalout = ""
         if len(removed) > 0:
-            finalout += f"Un-ignored {len(removed)} streamers:\n```" + ", ".join(sorted(removed)) + "```"
+            finalout += f"Un-ignored {len(removed)} streamers:\n```" + ", ".join(list(removed)) + "```"
         if len(added) > 0:
-            finalout += f"\nIgnored {len(added)} streamers:\n```" + ", ".join(sorted(added)) + "```"
+            finalout += f"\nIgnored {len(added)} streamers:\n```" + ", ".join(list(added)) + "```"
         return await ctx.send(finalout)
 
     @commands.command(aliases=["gamelist"])
@@ -547,9 +547,9 @@ class LiveCheck(commands.Cog):
                 added.add(game)
         finalout = ""
         if len(removed) > 0:
-            finalout += f"Un-whitelisted {len(removed)} games:\n```" + ", ".join(sorted(removed)) + "```"
+            finalout += f"Un-whitelisted {len(removed)} games:\n```" + ", ".join(list(removed)) + "```"
         if len(added) > 0:
-            finalout += f"\nWhitelisted {len(added)} games:\n```" + ", ".join(sorted(added)) + "```"
+            finalout += f"\nWhitelisted {len(added)} games:\n```" + ", ".join(list(added)) + "```"
         return await ctx.send(finalout)
 
     @commands.command(aliases=["requiregame"])
@@ -576,9 +576,9 @@ class LiveCheck(commands.Cog):
                 added.add(phrase)
         finalout = ""
         if len(removed) > 0:
-            finalout += f"Removed {len(removed)} phrases:\n```" + "\n".join(sorted(removed)) + "```"
+            finalout += f"Removed {len(removed)} phrases:\n```" + "\n".join(list(removed)) + "```"
         if len(added) > 0:
-            finalout += f"\nAdded {len(added)} phrases:\n```" + "\n".join(sorted(added)) + "```"
+            finalout += f"\nAdded {len(added)} phrases:\n```" + "\n".join(list(added)) + "```"
         return await ctx.send(finalout)
 
 
