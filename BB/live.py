@@ -151,7 +151,7 @@ class LiveCheck(commands.Cog):
                 sess.updating = False
             except Exception as e:
                 sess.updating = False
-                await self.BarryBot.logchan.send(f"Error in updating for guild {guild_id} ```{''.join(traceback.format_tb(e.__traceback__))}```")
+                await self.BarryBot.logchan.send(f"Error in updating for guild {guild_id} ```\n{''.join(traceback.format_tb(e.__traceback__))}```")
                 traceback.print_exc()
                 continue
 
@@ -505,7 +505,7 @@ class LiveCheck(commands.Cog):
                 return await ctx.send("There are no ignored streams.")
             else:
                 try:
-                    return await ctx.send(f"These are the ignored streams ({len(ignored_users)} of them):\n```"+", ".join(ignored_users)+"```")
+                    return await ctx.send(f"These are the ignored streams ({len(ignored_users)} of them):\n```\n"+", ".join(ignored_users)+"```")
                 except:
                     return await ctx.send(f"It seems you ignored so many users, the message was too big. There are {len(ignored_users)} users in the list. (contact bot dev for help)")
         removed = set()
@@ -518,9 +518,9 @@ class LiveCheck(commands.Cog):
                 added.add(streamer)
         finalout = ""
         if len(removed) > 0:
-            finalout += f"Un-ignored {len(removed)} streamers:\n```" + ", ".join(list(removed)) + "```"
+            finalout += f"Un-ignored {len(removed)} streamers:\n```\n" + ", ".join(sorted(removed)) + "```"
         if len(added) > 0:
-            finalout += f"\nIgnored {len(added)} streamers:\n```" + ", ".join(list(added)) + "```"
+            finalout += f"\nIgnored {len(added)} streamers:\n```\n" + ", ".join(sorted(added)) + "```"
         return await ctx.send(finalout)
 
     @commands.command(aliases=["gamelist"])
@@ -534,7 +534,7 @@ class LiveCheck(commands.Cog):
                 return await ctx.send("There are no whitelisted games. Any game may show up if a streamer is watched.")
             else:
                 try:
-                    return await ctx.send(f"These are the whitelisted categories ({len(whitelisted_games)} of them):\n```"+", ".join(whitelisted_games)+"```")
+                    return await ctx.send(f"These are the whitelisted categories ({len(whitelisted_games)} of them):\n```\n"+", ".join(whitelisted_games)+"```")
                 except:
                     return await ctx.send(f"It seems you whitelisted so many games, the message was too big. There are {len(whitelisted_games)} categories in the list. (contact bot dev for help)")
         removed = set()
@@ -547,9 +547,9 @@ class LiveCheck(commands.Cog):
                 added.add(game)
         finalout = ""
         if len(removed) > 0:
-            finalout += f"Un-whitelisted {len(removed)} games:\n```" + ", ".join(list(removed)) + "```"
+            finalout += f"Un-whitelisted {len(removed)} games:\n```\n" + ", ".join(sorted(removed)) + "```"
         if len(added) > 0:
-            finalout += f"\nWhitelisted {len(added)} games:\n```" + ", ".join(list(added)) + "```"
+            finalout += f"\nWhitelisted {len(added)} games:\n```\n" + ", ".join(sorted(added)) + "```"
         return await ctx.send(finalout)
 
     @commands.command(aliases=["requiregame"])
@@ -563,7 +563,7 @@ class LiveCheck(commands.Cog):
                 return await ctx.send("There are no required phrases. Any stream may show up if other conditions are met.")
             else:
                 try:
-                    return await ctx.send(f"These are the possible required phrases. Streams must contain any phrase ({len(title_contains)} phrases):\n```"+"\n".join(title_contains)+"```")
+                    return await ctx.send(f"These are the possible required phrases. Streams must contain any phrase ({len(title_contains)} phrases):\n```\n"+"\n".join(title_contains)+"```")
                 except:
                     return await ctx.send(f"It seems you added so many required phrases, the message was too big. There are {len(title_contains)} phrases. (contact bot dev for help)")
         removed = set()
@@ -576,9 +576,9 @@ class LiveCheck(commands.Cog):
                 added.add(phrase)
         finalout = ""
         if len(removed) > 0:
-            finalout += f"Removed {len(removed)} phrases:\n```" + "\n".join(list(removed)) + "```"
+            finalout += f"Removed {len(removed)} phrases:\n```\n" + "\n".join(sorted(removed)) + "```"
         if len(added) > 0:
-            finalout += f"\nAdded {len(added)} phrases:\n```" + "\n".join(list(added)) + "```"
+            finalout += f"\nAdded {len(added)} phrases:\n```\n" + "\n".join(sorted(added)) + "```"
         return await ctx.send(finalout)
 
 
@@ -593,7 +593,7 @@ class LiveCheck(commands.Cog):
                 return await ctx.send("There are no watched categories.")
             else:
                 try:
-                    return await ctx.send(f"These are the watched categories ({len(games)} of them):\n```"+", ".join(games)+"```")
+                    return await ctx.send(f"These are the watched categories ({len(games)} of them):\n```\n"+", ".join(games)+"```")
                 except:
                     return await ctx.send(f"It seems you watch so many categories, the message was too big. There are {len(games)} categories in the list. (contact bot dev for help)")
         if sess.toggleGame(game_name):
@@ -613,7 +613,7 @@ class LiveCheck(commands.Cog):
                 return await ctx.send("There are no watched streams.")
             else:
                 try:
-                    return await ctx.send(f"These are the watched streams ({len(streams)} of them):\n```"+", ".join(sorted(streams))+"```")
+                    return await ctx.send(f"These are the watched streams ({len(streams)} of them):\n```\n"+", ".join(sorted(streams))+"```")
                 except:
                     return await ctx.send(f"It seems you watch so many streams, the message was too big. There are {len(streams)} streamers in the list. (contact bot dev for help)")
         if not sess.toggleStreamer(streamer):
