@@ -13,6 +13,13 @@ from BB.DB import *
 from BB.permissions import *
 
 
+class MissingResponseField(Exception):
+    '''errors'''
+    def __init__(self, json_response, field):
+        self.json_response = json_response
+        self.field = field
+
+
 class LiveCheck(commands.Cog):
     '''
     Where the bulk of the action happens in terms of checking Twitch for live streams.
@@ -69,6 +76,13 @@ class LiveCheck(commands.Cog):
                         await self.BarryBot.logchan.send(failure)
                     failures = []
                 await self.aggregate_and_refresh_all()
+            except MissingResponseField as e:
+                failures.append(f"{dt.datetime.utcnow()} Failed due to missing JSON response field\nJSON: {e.json_response} MISSING FIELD: {e.field}")
+                try:
+                    traceback.print_exc()
+                    await self.BarryBot.logchan.send("There was an exception in the stream update loop.")
+                except:
+                    failures.append(f"{dt.datetime.utcnow()} Failed to send error report to log channel.")
             except Exception as e:
                 failures.append(f"{dt.datetime.utcnow()} Failed due to {e}")
                 try:
@@ -306,19 +320,23 @@ class LiveCheck(commands.Cog):
                 for name, stream_tuple in dict_o_streams.items():
                     if stream_tuple[0]["login"] in blacks: continue
                     if name in guild_streams: continue
-                    game_name = game_id_mappings2.get(stream_tuple[1]["game_id"], None)
-                    if game_name is None: continue
-                    if game_name == category:
-                        guild_streams[name] = stream_tuple
+                    # game_id sometimes is empty???
+                    if "game_id" in stream_tuple[1]:
+                        game_name = game_id_mappings2.get(stream_tuple[1]["game_id"], None)
+                        if game_name is None: continue
+                        if game_name == category:
+                            guild_streams[name] = stream_tuple
             # by name
             for streamer in sess.settings.get("Config", "defined_streams"):
                 if streamer in blacks: continue
                 if streamer in dict_o_streams:
                     if streamer in guild_streams: continue
                     if len(whites) > 0:
-                        # skip non whitelisted categories if applicable
-                        game_name = game_id_mappings2.get(dict_o_streams[streamer][1]["game_id"], None)
-                        if game_name is not None and game_name.lower() not in whites: continue
+                        # game_id sometimes is empty???
+                        if "game_id" in dict_o_streams[streamer][1]:
+                            # skip non whitelisted categories if applicable
+                            game_name = game_id_mappings2.get(dict_o_streams[streamer][1]["game_id"], None)
+                            if game_name is not None and game_name.lower() not in whites: continue
                     guild_streams[streamer] = dict_o_streams[streamer]
             output[guild_id] = guild_streams
         # output is:
@@ -350,6 +368,13 @@ class LiveCheck(commands.Cog):
                     attempt = False
         return output
 
+    def get_json_field(self, json_response, field):
+        '''return the json_response data wrapped in error stuff'''
+        if field in json_response:
+            return json_response[field]
+        else:
+            raise MissingResponseField(json_response, field)
+
     async def gather_byGame(self, games):
         '''return the list of streams streaming the list of games given'''
         game_ids = list((await self.get_game_id_by_names(games)).values())
@@ -361,11 +386,11 @@ class LiveCheck(commands.Cog):
             while paginating:
                 this = f"https://api.twitch.tv/helix/streams?{'&'.join([f'game_id={x}' for x in game_ids[i:i+100]])}&first=100{cursor}"
                 json_response = await self.wait_for_request_window(this)
-                if len(json_response['data']) != 100:
+                if len(self.get_json_field(json_response, "data")) != 100:
                     paginating = False
                 else:
-                    cursor = f'&after={json_response["pagination"]["cursor"]}'
-                stream_list.extend(json_response["data"])
+                    cursor = f'&after={self.get_json_field(json_response, "pagination")["cursor"]}'
+                stream_list.extend(self.get_json_field(json_response, "data"))
         return stream_list
 
     async def gather_byUser(self, users):
@@ -378,11 +403,11 @@ class LiveCheck(commands.Cog):
             while paginating:
                 this = f"https://api.twitch.tv/helix/streams?{'&'.join([f'user_login={x}' for x in users[i:i+100]])}&first=100{cursor}"
                 json_response = await self.wait_for_request_window(this)
-                if len(json_response['data']) != 100:
+                if len(self.get_json_field(json_response, "data")) != 100:
                     paginating = False
                 else:
-                    cursor = f'&after={json_response["pagination"]["cursor"]}'
-                stream_list.extend(json_response["data"])
+                    cursor = f'&after={self.get_json_field(json_response, "pagination")["cursor"]}'
+                stream_list.extend(self.get_json_field(json_response, "data"))
         return stream_list
 
     async def gather_userinfo_by_id(self, users):
@@ -391,7 +416,7 @@ class LiveCheck(commands.Cog):
         for i in range(0, len(users), 100):
             this = f"https://api.twitch.tv/helix/users?{'&'.join([f'id={x}' for x in users[i:i+100]])}"
             json_response = await self.wait_for_request_window(this)
-            stream_list.extend(json_response["data"])
+            stream_list.extend(self.get_json_field(json_response, "data"))
         return stream_list
 
     async def gather_userinfo_by_name(self, users):
@@ -400,20 +425,20 @@ class LiveCheck(commands.Cog):
         for i in range(0, len(users), 100):
             this = f"https://api.twitch.tv/helix/users?{'&'.join([f'login={x}' for x in users[i:i+100]])}"
             json_response = await self.wait_for_request_window(this)
-            stream_list.extend(json_response["data"])
+            stream_list.extend(self.get_json_field(json_response, "data"))
         return stream_list
 
     async def get_userinfo_by_id(self, user_id):
         '''return the dict for a user by their id'''
         this = f"https://api.twitch.tv/helix/users?id={user_id}"
         json_response = await self.wait_for_request_window(this)
-        return json_response["data"]
+        return self.get_json_field(json_response, "data")
     
     async def get_followcount_by_id(self, user_id):
         '''return the number of followers for a user id'''
         this = f"https://api.twitch.tv/helix/users/follows?to_id={user_id}"
         json_response = await self.wait_for_request_window(this)
-        return json_response["total"]
+        return self.get_json_field(json_response, "data")
 
     async def get_game_id_by_names(self, game_names):
         '''
@@ -425,7 +450,7 @@ class LiveCheck(commands.Cog):
         for i in range(0, len(game_names), 100):
             this = f"https://api.twitch.tv/helix/games?{'&'.join([f'name={x}' for x in game_names[i:i+100]])}"
             json_response = await self.wait_for_request_window(this)
-            for game in json_response["data"]:
+            for game in self.get_json_field(json_response, "data"):
                 game_ids[game["name"]] = game["id"]
         return game_ids
 
@@ -439,7 +464,7 @@ class LiveCheck(commands.Cog):
         for i in range(0, len(game_ids), 100):
             this = f"https://api.twitch.tv/helix/games?{'&'.join([f'id={x}' for x in game_ids[i:i+100]])}"
             json_response = await self.wait_for_request_window(this)
-            for game in json_response["data"]:
+            for game in self.get_json_field(json_response, "data"):
                 game_names[game["id"]] = game["name"]
         return game_names
 
@@ -454,7 +479,7 @@ class LiveCheck(commands.Cog):
             this = f"https://api.twitch.tv/helix/users?{'&'.join([f'login={x}' for x in names[i:i+100]])}"
             json_response = await self.wait_for_request_window(this)
             json_response = await response.json()
-            for channel in json_response["data"]:
+            for channel in self.get_json_field(json_response, "data"):
                 channel_ids[channel["login"]] = channel["id"]
         return channel_id
     
@@ -464,7 +489,7 @@ class LiveCheck(commands.Cog):
         Pass a channel id string to try a specific channel id
         '''
         json_response = await self.wait_for_request_window("https://api.twitch.tv/helix/streams?user_id=" + channel_id)
-        return len(json_response["data"]) != 0
+        return len(self.get_json_field(json_response, "data")) != 0
 
     @commands.Cog.listener()
     async def on_ready(self):
