@@ -306,6 +306,7 @@ class LiveCheck(commands.Cog):
             sess = self.sessions[guild_id]
             blacks = set(sess.settings.get('Config', "blacklisted_streams"))
             whites = set(sess.settings.get('Config', "whitelisted_games"))
+            title_contains = set(sess.settings.get('Config', "title_contains"))
             guild_streams = {}
             # by game
             for category in sess.settings.get("Config", "defined_games"):
@@ -313,6 +314,15 @@ class LiveCheck(commands.Cog):
                 for name, stream_tuple in dict_o_streams.items():
                     if stream_tuple[0]["login"] in blacks: continue
                     if name in guild_streams: continue # skip streams already added
+                    # skip streams not containing the whitelisted word if applicable
+                    if len(title_contains) > 0:
+                        allowed = False
+                        if "title" in stream_tuple[1]:
+                            title = stream_tuple[1]["title"].lower()
+                            for phrase in title_contains:
+                                if phrase in title:
+                                    allowed = True
+                        if not allowed: continue
                     # game_id sometimes is empty???
                     if "game_id" in stream_tuple[1]:
                         game_name = game_id_mappings2.get(stream_tuple[1]["game_id"], None)
@@ -324,6 +334,15 @@ class LiveCheck(commands.Cog):
                 if streamer in blacks: continue
                 if streamer in dict_o_streams:
                     if streamer in guild_streams: continue # skip streams already added
+                    # skip streams not containing the whitelisted word if applicable
+                    if len(title_contains) > 0:
+                        allowed = False
+                        if "title" in stream_tuple[1]:
+                            title = stream_tuple[1]["title"].lower()
+                            for phrase in title_contains:
+                                if phrase in title:
+                                    allowed = True
+                        if not allowed: continue
                     if len(whites) > 0:
                         # game_id sometimes is empty???
                         if "game_id" in dict_o_streams[streamer][1]:
@@ -533,6 +552,35 @@ class LiveCheck(commands.Cog):
             finalout += f"\nWhitelisted {len(added)} games:\n```" + ", ".join(sorted(added)) + "```"
         return await ctx.send(finalout)
 
+    @commands.command(aliases=["requiregame"])
+    @command.check(Perms.is_guild_mod)
+    async def require(self, ctx, *phrases):
+        '''- Set a list of phrases all streams must contain. Stream may contain ANY phrase.'''
+        sess = self.sessions[ctx.guild.id]
+        if len(phrases) == 0:
+            title_contains = sess.settings.get("Config", "title_contains")
+            if len(title_contains) == 0:
+                return await ctx.send("There are no required phrases. Any stream may show up if other conditions are met.")
+            else:
+                try:
+                    return await ctx.send(f"These are the possible required phrases. Streams must contain any phrase ({len(title_contains)} phrases):\n```"+"\n".join(title_contains)+"```")
+                except:
+                    return await ctx.send(f"It seems you added so many required phrases, the message was too big. There are {len(title_contains)} phrases. (contact bot dev for help)")
+        removed = set()
+        added = set()
+        phrases = set([x.lower() for x in phrases])
+        for phrase in sorted(phrases):
+            if not sess.toggleRequiredPhrase(phrase)
+                removed.add(phrase)
+            else:
+                added.add(phrase)
+        finalout = ""
+        if len(removed) > 0:
+            finalout += f"Removed {len(removed)} phrases:\n```" + "\n".join(sorted(removed)) + "```"
+        if len(added) > 0:
+            finalout += f"\nAdded {len(added)} phrases:\n```" + "\n".join(sorted(added)) + "```"
+        return await ctx.send(finalout)
+
 
     @commands.command(aliases=["cat", "category", "watch"])
     @commands.check(Perms.is_guild_mod)
@@ -655,8 +703,8 @@ class LiveBrain:
         self.verifyTables()
         
         # this holds a dict called configuration which holds 5 keys
-        # "defined_streams", "defined_games", "blacklisted_streams", "whitelisted_games", channel_id"
-        # the first 4 are strings in the form of a list while the last is a single id
+        # "defined_streams", "defined_games", "blacklisted_streams", "whitelisted_games", "title_contains", "channel_id"
+        # the first 5 are strings in the form of a list while the last is a single id
         self.settings = ServerSettings(serverID, config)
 
         self.created_messages = set()
@@ -704,6 +752,10 @@ class LiveBrain:
         '''add or remove a streamer from the list'''
         return self.__toggleConfigThing("defined_streams", streamer)
 
+    def toggleRequiredPhrase(self, phrase):
+        '''add or remove a phrase from the whitelist'''
+        return self.__toggleConfigThing("title_contains", phrase)
+
     def setChannel(self, chan_id):
         '''set the channel id'''
         self.settings.modify("Config", "channel_id", str(chan_id))
@@ -725,6 +777,7 @@ class LiveBrain:
 class ServerSettings:
     # this is the object which describes each servers settings
     # it parses a .ini file given by the server id and so forth
+    # the string list thing relies on splitting stuff by "^^" which IS SUCH A BAD IDEA OH MY GOD
     
     def __init__(self, serverID, config):
         self.serverID = str(serverID)
@@ -791,7 +844,7 @@ class ServerSettings:
 
 
         with open(self.config_filepath, "w", encoding="utf-8") as file:
-                self.config.write(file)
+            self.config.write(file)
         return changes_made
 
     def sanity_check(self, guild):
@@ -800,6 +853,7 @@ class ServerSettings:
         self.sanity_check_individual("Config", "defined_games", guild)
         self.sanity_check_individual("Config", "blacklisted_streams", guild)
         self.sanity_check_individual("Config", "whitelisted_games", guild)
+        self.sanity_check_individual("Config", "title_contains", guild)
         self.sanity_check_individual("Config", "channel_id", guild)
 
     def sanity_check_individual(self, section, name, guild):
