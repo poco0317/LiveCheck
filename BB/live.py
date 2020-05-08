@@ -435,7 +435,7 @@ class LiveCheck(commands.Cog):
         '''return the number of followers for a user id'''
         this = f"https://api.twitch.tv/helix/users/follows?to_id={user_id}"
         json_response = await self.wait_for_request_window(this)
-        return self.get_json_field(json_response, "data")
+        return self.get_json_field(json_response, "total")
 
     async def get_game_id_by_names(self, game_names):
         '''
