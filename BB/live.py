@@ -38,7 +38,6 @@ class LiveCheck(commands.Cog):
             gather_byGame - run get_game_id_by_names,   2-n requests
         Get the misc info about streamers/blacklisted streamers
             gather_userinfo_by_id - chunks of 100,      1-n requests
-            gather_userinfo_by_name - chunks of 100,    1-n requests
         Figure out the streams that went offline and went online
         Delete offline streams
         Push new streams (per stream per server)
@@ -262,11 +261,9 @@ class LiveCheck(commands.Cog):
         skipped_guilds = set()
         games = set()
         users = set()
-        blacks = set()
-        whites = set()
+        blacks = set() # blacklisted users
+        whites = set() # whitelisted categories for user defined lists
         output = {}
-        blacklisted_streams = {} # mapping server ids to lists of streams
-        whitelisted_games = {} # mapping server ids to lists of categories
         todo = self.sessions.keys()
         if specific_guild is not None:
             todo = [specific_guild]
@@ -277,10 +274,9 @@ class LiveCheck(commands.Cog):
             except:
                 skipped_guilds.add(guild_id)
                 continue
+            # doing these feels redundant and actually useless but im going to leave it here
             games |= set(sess.settings.get("Config", "defined_games"))
-            whites |= set(sess.settings.get("Config", "whitelisted_games"))
             users |= set(sess.settings.get("Config", "defined_streams"))
-            blacks |= set(sess.settings.get("Config", "blacklisted_streams"))
         user_streams = await self.gather_byUser(list(users))
         game_ids = set()
         games_to_resolve = set()
@@ -288,8 +284,6 @@ class LiveCheck(commands.Cog):
             game_ids.add(stream["game_id"])
         game_id_mappings = await self.get_game_id_by_names(list(games)) # a map of names to ids
         game_id_mappings2 = dict((v,k) for k,v in game_id_mappings.items()) # swapped version of that list
-        whitelisted_game_mapping_ids = await self.get_game_id_by_names(list(whites)) # a map of names to ids
-        whitelisted_game_mapping_names = dict((v,k) for k,v in whitelisted_game_mapping_ids.items()) # a swapped version of that list
         for gameid in game_ids:
             if gameid not in game_id_mappings2:
                 games_to_resolve.add(gameid)
@@ -301,7 +295,6 @@ class LiveCheck(commands.Cog):
         all_streams_by_id = {x["user_id"]:x for x in unique_combo}
         all_stream_ids = {x["user_id"] for x in game_streams} | {x["user_id"] for x in user_streams}
         all_stream_userinfo = await self.gather_userinfo_by_id(list(all_stream_ids))
-        every_blacklisted_stream = await self.gather_userinfo_by_name(list(blacks))
         # building a big dict of streams from the user info and the given streams
         dict_o_streams = {}
         for stream in all_stream_userinfo:
@@ -319,7 +312,7 @@ class LiveCheck(commands.Cog):
                 if len(whites) > 0 and category not in whites: continue # skip non whitelisted categories if applicable
                 for name, stream_tuple in dict_o_streams.items():
                     if stream_tuple[0]["login"] in blacks: continue
-                    if name in guild_streams: continue
+                    if name in guild_streams: continue # skip streams already added
                     # game_id sometimes is empty???
                     if "game_id" in stream_tuple[1]:
                         game_name = game_id_mappings2.get(stream_tuple[1]["game_id"], None)
@@ -330,7 +323,7 @@ class LiveCheck(commands.Cog):
             for streamer in sess.settings.get("Config", "defined_streams"):
                 if streamer in blacks: continue
                 if streamer in dict_o_streams:
-                    if streamer in guild_streams: continue
+                    if streamer in guild_streams: continue # skip streams already added
                     if len(whites) > 0:
                         # game_id sometimes is empty???
                         if "game_id" in dict_o_streams[streamer][1]:
@@ -418,21 +411,6 @@ class LiveCheck(commands.Cog):
             json_response = await self.wait_for_request_window(this)
             stream_list.extend(self.get_json_field(json_response, "data"))
         return stream_list
-
-    async def gather_userinfo_by_name(self, users):
-        '''return the list of users by name, for extra info'''
-        stream_list = []
-        for i in range(0, len(users), 100):
-            this = f"https://api.twitch.tv/helix/users?{'&'.join([f'login={x}' for x in users[i:i+100]])}"
-            json_response = await self.wait_for_request_window(this)
-            stream_list.extend(self.get_json_field(json_response, "data"))
-        return stream_list
-
-    async def get_userinfo_by_id(self, user_id):
-        '''return the dict for a user by their id'''
-        this = f"https://api.twitch.tv/helix/users?id={user_id}"
-        json_response = await self.wait_for_request_window(this)
-        return self.get_json_field(json_response, "data")
     
     async def get_followcount_by_id(self, user_id):
         '''return the number of followers for a user id'''
@@ -467,29 +445,6 @@ class LiveCheck(commands.Cog):
             for game in self.get_json_field(json_response, "data"):
                 game_names[game["id"]] = game["name"]
         return game_names
-
-    async def get_channel_id_by_names(self, names):
-        '''
-        Use new twitch api to get a channel id by login name
-        names needs to be a list of strings
-        returns a dict mapping those names to ids
-        '''
-        channel_ids = {}
-        for i in range(0, len(names), 100):
-            this = f"https://api.twitch.tv/helix/users?{'&'.join([f'login={x}' for x in names[i:i+100]])}"
-            json_response = await self.wait_for_request_window(this)
-            json_response = await response.json()
-            for channel in self.get_json_field(json_response, "data"):
-                channel_ids[channel["login"]] = channel["id"]
-        return channel_id
-    
-    async def is_live(self, channel_id):
-        '''
-        Use new twitch api in a scuffed way to find out if a channel is live
-        Pass a channel id string to try a specific channel id
-        '''
-        json_response = await self.wait_for_request_window("https://api.twitch.tv/helix/streams?user_id=" + channel_id)
-        return len(self.get_json_field(json_response, "data")) != 0
 
     @commands.Cog.listener()
     async def on_ready(self):
