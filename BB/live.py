@@ -64,11 +64,11 @@ class LiveCheck(commands.Cog):
         while True:
             await asyncio.sleep(300)
             try:
-                await self.aggregate_and_refresh_all()
                 if len(failures) > 0:
                     for failure in failures:
                         await self.BarryBot.logchan.send(failure)
                     failures = []
+                await self.aggregate_and_refresh_all()
             except Exception as e:
                 failures.append(f"{dt.datetime.utcnow()} Failed due to {e}")
                 try:
