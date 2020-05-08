@@ -553,7 +553,7 @@ class LiveCheck(commands.Cog):
         return await ctx.send(finalout)
 
     @commands.command(aliases=["requiregame"])
-    @command.check(Perms.is_guild_mod)
+    @commands.check(Perms.is_guild_mod)
     async def require(self, ctx, *phrases):
         '''- Set a list of phrases all streams must contain. Stream may contain ANY phrase.'''
         sess = self.sessions[ctx.guild.id]
