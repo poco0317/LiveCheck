@@ -570,7 +570,7 @@ class LiveCheck(commands.Cog):
         added = set()
         phrases = set([x.lower() for x in phrases])
         for phrase in sorted(phrases):
-            if not sess.toggleRequiredPhrase(phrase)
+            if not sess.toggleRequiredPhrase(phrase):
                 removed.add(phrase)
             else:
                 added.add(phrase)
