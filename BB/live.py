@@ -79,11 +79,12 @@ class LiveCheck(commands.Cog):
     async def validate_token(self):
         tmp_session = aiohttp.ClientSession(headers={"Client-ID": self.config.auth_id, "Authorization": f"OAuth {self.auth_token}"})
         try:
+            left = 0
             async with tmp_session.get("https://id.twitch.tv/oauth2/validate") as response:
                 output = await response.json()
                 left = int(output["expires_in"])
-                return left > 0
             await tmp_session.close()
+            return left > 0
         except:
             # Probably failed to validate.
             raise ValidationError(response)
