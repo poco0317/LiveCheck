@@ -19,6 +19,11 @@ class MissingResponseField(Exception):
         self.json_response = json_response
         self.field = field
 
+class ValidationError(Exception):
+    '''errors2'''
+    def __init__(self, response):
+        # response is a response object and not json
+        self.response = response
 
 class LiveCheck(commands.Cog):
     '''
@@ -57,13 +62,36 @@ class LiveCheck(commands.Cog):
 
         self.sessions = {}
 
+        # generate the bearer token on startup because we dont feel like maintaining it
+        # and its not that bad of a thing anyways unless we keep regenerating it every 2 seconds
+        self.auth_token = None
         self.aio_session = None
 
         self.bot.loop.create_task(self.set_aio())
+        self.bot.loop.create_task(self.refresh_token())
         self.bot.loop.create_task(self.livecheck_loop())
 
     async def set_aio(self):
-        self.aio_session = aiohttp.ClientSession(headers={"Client-ID": self.config.auth_id})
+        # "OAuth" required for any token to validate token
+        # "Bearer" required for bearer token to authorize our usual requests
+        self.aio_session = aiohttp.ClientSession(headers={"Client-ID": self.config.auth_id, "Authorization": f"Bearer {self.auth_token}"})
+
+    async def validate_token(self):
+        tmp_session = aiohttp.ClientSession(headers={"Client-ID": self.config.auth_id, "Authorization": f"OAuth {self.auth_token}"})
+        try:
+            async with tmp_session.get("https://id.twitch.tv/oauth2/validate") as response:
+                output = await response.json()
+                left = int(output["expires_in"])
+                return left > 0
+        except:
+            # Probably failed to validate.
+            raise ValidationError(response)
+
+    async def refresh_token(self):
+        async with self.aio_session.post(f"https://id.twitch.tv/oauth2/token?client_id={self.config.auth_id}&client_secret={self.config.auth_secret}&grant_type=client_credentials") as response:
+            output = await response.json()
+            self.auth_token = output["access_token"]
+            return output["expires_in"]
 
     async def livecheck_loop(self):
         failures = []
@@ -74,9 +102,25 @@ class LiveCheck(commands.Cog):
                     for failure in failures:
                         await self.BarryBot.logchan.send(failure)
                     failures = []
+                if not await self.validate_token():
+                    await self.BarryBot.logchan.send("Token failed to validate. It may have expired. Refreshing.")
+                    expire_time = await self.refresh_token()
+                    await self.BarryBot.logchan.send(f"Token refreshed. It should expire in {expire_time}")
                 await self.aggregate_and_refresh_all()
             except MissingResponseField as e:
                 failures.append(f"{dt.datetime.utcnow()} Failed due to missing JSON response field\nJSON: {e.json_response} MISSING FIELD: {e.field}")
+                try:
+                    traceback.print_exc()
+                    await self.BarryBot.logchan.send("There was an exception in the stream update loop.")
+                except:
+                    failures.append(f"{dt.datetime.utcnow()} Failed to send error report to log channel.")
+            except ValidationError as e:
+                failures.append(f"{dt.datetime.utcnow()} Failed due to Validation Error. Bad URL or Response Parsing\nResponse: {str(e.response)}")
+                try:
+                    expire_time = await self.refresh_token()
+                    failures.append(f"... Successfully refreshed token with expire time {expire_time}")
+                except:
+                    failures.append("... And then failed to refresh token.")
                 try:
                     traceback.print_exc()
                     await self.BarryBot.logchan.send("There was an exception in the stream update loop.")
@@ -479,13 +523,14 @@ class LiveCheck(commands.Cog):
 
     @commands.command()
     @commands.check(Perms.is_owner)
-    async def testurl(self, ctx):
-        ''' eee'''
-        id = self.config.auth_id
-        secret = self.config.auth_secret
-        async with self.aio_session.get("https://id.twitch.tv") as response:
-            output = await response.json()
-            print(response)
+    async def refreshtoken(self, ctx):
+        '''- Force the OAuth token to refresh'''
+        try:
+            expire_time = await self.refresh_token()
+            await ctx.send(f"Successfully refreshed: Expires in {expire_time}")
+        except:
+            traceback.print_exc()
+            await ctx.send("Failed to refresh.")
 
     @commands.command()
     @commands.check(Perms.is_owner)
