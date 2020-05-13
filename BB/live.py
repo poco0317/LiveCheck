@@ -91,6 +91,11 @@ class LiveCheck(commands.Cog):
         async with self.aio_session.post(f"https://id.twitch.tv/oauth2/token?client_id={self.config.auth_id}&client_secret={self.config.auth_secret}&grant_type=client_credentials") as response:
             output = await response.json()
             self.auth_token = output["access_token"]
+            try:
+                self.aio_session.close()
+            except:
+                pass # uhhhh
+            await self.set_aio()
             return output["expires_in"]
 
     async def livecheck_loop(self):
