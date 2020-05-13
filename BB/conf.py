@@ -24,6 +24,7 @@ class Conf:
         self.THE_TOKEN = config.get("Login", "Token", fallback=Fallbacks.token)
         self.owner_id = int(config.get("Permissions", "OwnerID", fallback=Fallbacks.ownerID))
         self.auth_id = config.get("Twitch", "Auth_ID", fallback=Fallbacks.auth_id)
+        self.auth_secret = config.get("Twitch", "SECRET", fallback=Fallbacks.auth_secret)
         self.log_server_id = int(config.get("Logging", "ServerID", fallback=Fallbacks.log_server_id))
         self.log_chan_id = int(config.get("Logging", "ChannelID", fallback=Fallbacks.log_chan_id))
 
@@ -32,5 +33,6 @@ class Fallbacks:
     token = "0"
     ownerID = 0
     auth_id = "no"
+    auth_secret = "no"
     log_server_id = 0
     log_chan_id = 0

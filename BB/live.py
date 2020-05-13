@@ -479,6 +479,16 @@ class LiveCheck(commands.Cog):
 
     @commands.command()
     @commands.check(Perms.is_owner)
+    async def testurl(self, ctx):
+        ''' eee'''
+        id = self.config.auth_id
+        secret = self.config.auth_secret
+        async with self.aio_session.get("https://id.twitch.tv") as response:
+            output = await response.json()
+            print(response)
+
+    @commands.command()
+    @commands.check(Perms.is_owner)
     async def globalupdate(self, ctx):
         '''- Force update every server for the bot'''
         await self.aggregate_and_refresh_all()
