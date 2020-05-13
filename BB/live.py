@@ -83,7 +83,7 @@ class LiveCheck(commands.Cog):
                 output = await response.json()
                 left = int(output["expires_in"])
                 return left > 0
-            tmp_session.close()
+            await tmp_session.close()
         except:
             # Probably failed to validate.
             raise ValidationError(response)
@@ -94,7 +94,7 @@ class LiveCheck(commands.Cog):
             output = await response.json()
             self.auth_token = output["access_token"]
         try:
-            self.aio_session.close()
+            await self.aio_session.close()
         except:
             pass # uhhhh
         await self.set_aio()
