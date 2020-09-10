@@ -298,13 +298,13 @@ class LiveCheck(commands.Cog):
         e.add_field(name="Total Views", value=userinfo["view_count"])
         e.add_field(name="Current Views", value=stream["viewer_count"])
         btype = userinfo["broadcaster_type"]
-        if btype == "":
+        if btype == "" or btype is None:
             btype = "Non-Affiliate"
         else:
             btype = btype.capitalize()
         e.add_field(name="Status", value=btype)
         desc = userinfo["description"]
-        if desc == "":
+        if desc == "" or desc is None:
             desc = "No description"
         e.add_field(name="Description", value=desc)
         return e
